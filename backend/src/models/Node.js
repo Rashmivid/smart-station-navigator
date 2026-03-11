@@ -1,19 +1,19 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const nodeSchema = new mongoose.Schema({
-    nodeId:{
-        type:String,
-        required:true,
-    },
-    location:{
-        lat:Number,
-        lng:Number,
-    },
-    station:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref: "Station",
-        required: true,
-    },
-
+  nodeId: {
+    type: Number,
+    required: true
+  },
+  station: {
+    type: Number,
+    required: true
+  },
+  name: String,
+  location: {
+    lat: Number,
+    lng: Number
+  }
 });
-module.exports = mongoose.model("Node",nodeSchema);
+
+module.exports = mongoose.model("Node", nodeSchema);
