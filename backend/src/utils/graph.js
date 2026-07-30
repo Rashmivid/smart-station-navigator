@@ -73,10 +73,18 @@ function dijkstra(graph, start, end) {
     });
   }
 
+  if (distances[end] === Infinity) {
+  return {
+    distance: null,
+    path: []
+  };
+}
+
   const path = [];
   let current = end;
 
-  while (current) {
+
+  while (current !==undefined) {
     path.unshift(current);
     current = previous[current];
   }
