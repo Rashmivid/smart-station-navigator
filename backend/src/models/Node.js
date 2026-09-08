@@ -1,19 +1,27 @@
 const mongoose = require("mongoose");
 
 const nodeSchema = new mongoose.Schema({
-  nodeId: {
+  nodeID: {
     type: Number,
     required: true
   },
   station: {
-    type: Number,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Station",
     required: true
   },
-  name: String,
+  name: {
+    type: String,
+    required: true
+  },
   location: {
     lat: Number,
     lng: Number
   }
-});
+},
+{
+  timestamps: true
+}
+);
 
 module.exports = mongoose.model("Node", nodeSchema);

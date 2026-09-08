@@ -3,6 +3,7 @@ const poiSchema = new mongoose.Schema({
     name: {
         type:String,
         required: true,
+        trim: true
     },
     type:{
         type:String,
@@ -23,11 +24,19 @@ const poiSchema = new mongoose.Schema({
         lat: Number,
         lng: Number,
     },
+    nodeId:{
+        type: Number,
+        required: true
+    },
     station:{
         type: mongoose.Schema.Types.ObjectId,
         ref:"Station",
         required: true,
 
-    },
-});
+    }
+},
+    {
+        timeStamps: true
+    }
+);
 module.exports = mongoose.model("POI",poiSchema);

@@ -1,5 +1,6 @@
 const Edge = require("../models/Edge");
 const Node = require("../models/Node");
+const mongoose = require('mongoose');
 
 const { buildGraph, dijkstra } = require("../utils/graph");
 
@@ -13,29 +14,36 @@ exports.getNavigation = async (req, res) => {
         success: false,
         message: "Station, start and end query parameters are required."
       });
+
+    }
+    // validate mongoDB objectId...
+    if(!mongoose.Types.ObjectId.isValid(station))
+    {
+      return res.status(400).json({
+        success:false,
+        message: "Station ID does not exist"
+      });
     }
 
+    const stationID = new mongoose.Types.ObjectId(station);
     // Convert query parameters to numbers
-    const stationId = Number(station);
     const startNode = Number(start);
     const endNode = Number(end);
 
     // Validate numbers
     if (
-      Number.isNaN(stationId) ||
-      Number.isNaN(startNode) ||
-      Number.isNaN(endNode)
+      !Number.isInteger(startNode) || !Number.isInteger(endNode)
     ) {
       return res.status(400).json({
         success: false,
-        message: "Station, start and end must be valid numbers."
+        message: "Start and end must be valid node Id."
       });
     }
 
     // Check whether start and end nodes exist in the station
     const existingNodes = await Node.find({
-      station: stationId,
-      nodeId: { $in: [startNode, endNode] }
+      station:stationID,
+      nodeID: { $in: [startNode, endNode] }
     });
 
     const expectedNodes = startNode === endNode ? 1 : 2;
@@ -49,24 +57,26 @@ exports.getNavigation = async (req, res) => {
 
     // If start and end are the same node
   if (startNode === endNode) {
-    const node = await Node.findOne({
-      station: stationId,
-      nodeId: startNode
-    });
+    // const node = await Node.findOne({
+    //   station,
+    //   nodeId: startNode
+    // });
 
   return res.status(200).json({
     success: true,
     message: "Start and destination are the same.",
     data: {
-      station: stationId,
+      station:stationID,
       distance: 0,
-      path: [node.name]
+      path: [existingNodes[0].name]
     }
   });
 }
 
     // Fetch edges for the station
-    const edges = await Edge.find({ station: stationId });
+    const edges = await Edge.find({
+      station:stationID
+    });
 
     if (!edges.length) {
       return res.status(404).json({
@@ -90,13 +100,14 @@ exports.getNavigation = async (req, res) => {
 
     // Fetch readable node names
     const nodes = await Node.find({
-      nodeId: { $in: result.path }
+      station:stationID,
+      nodeID: { $in: result.path }
     });
 
     const nodeMap = {};
 
     nodes.forEach((node) => {
-      nodeMap[node.nodeId] = node.name;
+      nodeMap[node.nodeID] = node.name;
     });
 
     const readablePath = result.path.map(
@@ -107,7 +118,7 @@ exports.getNavigation = async (req, res) => {
       success: true,
       message: "Navigation route found successfully.",
       data: {
-        station: stationId,
+        station: stationID,
         distance: result.distance,
         path: readablePath
       }
