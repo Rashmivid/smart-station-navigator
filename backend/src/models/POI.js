@@ -21,10 +21,17 @@ const poiSchema = new mongoose.Schema({
 
     },
     location: {
-        lat: Number,
-        lng: Number,
+        lat:{
+            type: Number,
+            required: true
+
+        },
+        lng: {
+            type: Number,
+            required: true
+        }
     },
-    nodeId:{
+    nodeID:{
         type: Number,
         required: true
     },

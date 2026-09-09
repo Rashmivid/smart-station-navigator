@@ -2,6 +2,7 @@ const Edge = require("../models/Edge");
 const Node = require("../models/Node");
 const mongoose = require('mongoose');
 
+
 const { buildGraph, dijkstra } = require("../utils/graph");
 
 exports.getNavigation = async (req, res) => {
