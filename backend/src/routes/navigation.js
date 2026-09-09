@@ -1,8 +1,10 @@
 const express = require("express");
 const router = express.Router();
 
-const { getNavigation } = require("../controllers/navigationController");
+const navigationController = require("../controllers/navigationController");
 
-router.get("/", getNavigation);
+router.get("/", navigationController.getNavigation);
+
+router.get("/nearest-poi",navigationController.getNearestPOI);
 
 module.exports = router;

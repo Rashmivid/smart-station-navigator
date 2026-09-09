@@ -1,9 +1,154 @@
 const Edge = require("../models/Edge");
 const Node = require("../models/Node");
 const mongoose = require('mongoose');
-
+const POI = require("../models/POI");
 
 const { buildGraph, dijkstra } = require("../utils/graph");
+
+exports.getNearestPOI = async (req,res) =>{
+  try{
+    const {station , start, type } = req.query;
+
+    if(!station || !start || !type)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Station, Start, type are required field"
+      });
+    }
+
+    if(!mongoose.Types.ObjectId.isValid(station))
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Station is Invalid"
+      });
+    }
+
+    const stationID = new mongoose.Types.ObjectId(station);
+
+    const startNode = Number(start);
+    if(!Number.isInteger(startNode))
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Start node must be integer value"
+      });
+    }
+
+    const startingNode = await Node.findOne({
+      station: stationID,
+      nodeID : startNode
+    });
+
+    if(!startingNode)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Starting node not found in the station"
+      });
+    }
+
+    const pois = await POI.find({
+      station : stationID,
+      type: type
+    });
+
+    if(!pois.length)
+    {
+      return res.status(400).json({
+        success: false,
+        message: `No such POI is fount with type '${type}'.`
+      });
+    }
+
+    const edges = await Edge.find({
+      station: stationID
+    });
+
+    if(!edges.length)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "No edges are found for the selected station"
+      });
+    }
+
+    const graph = buildGraph(edges);
+    let nearestPOI = null;
+
+    for (const poi of pois)
+    {
+      const result = dijkstra(
+        graph,
+        startNode,
+        poi.nodeID
+      );
+
+      if(result.distance == null)
+      {
+        continue;
+      }
+      if(
+        nearestPOI === null ||
+        result.distance < nearestPOI.distance
+      )
+      {
+        nearestPOI = {
+          poi,
+          distance: result.distance,
+          path: result.path
+        };
+      } 
+    }
+
+    if(!nearestPOI)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "POI is not reachable"
+      });
+    }
+
+    const routeNodes = await Node.find({
+      station: stationID,
+      nodeID: { $in: nearestPOI.path }
+    });
+
+    const nodeMap = {};
+    routeNodes.forEach((node) => {
+      nodeMap[node.nodeID] = node.name;
+    });
+
+
+    const readablePath = nearestPOI.path.map(
+      (nodeId) => nodeMap[nodeId] || `Node ${nodeId}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Nearest POI found successfully.",
+      data: {
+        poi: {
+          name: nearestPOI.poi.name,
+          type: nearestPOI.poi.type,
+          nodeID: nearestPOI.poi.nodeID,
+          location: nearestPOI.poi.location
+        },
+        distance: nearestPOI.distance,
+        path: readablePath
+      }
+    });
+   
+  }
+
+catch{
+  return res.status(500).json({
+      success: false,
+      message: "Internal Server Error."
+    });
+}
+};
 
 exports.getNavigation = async (req, res) => {
   try {
