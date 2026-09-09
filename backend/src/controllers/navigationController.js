@@ -279,3 +279,143 @@ exports.getNavigation = async (req, res) => {
     });
   }
 };
+
+exports.getNearbyPOIs = async (req,res) =>{
+  try{
+    const{ station ,start, type} = req.query;
+
+    if(!station || !start || !type)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Station, start and type is required"
+      });
+    }
+
+    if(!mongoose.Types.ObjectId.isValid(station))
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Station ID is not valid"
+      });
+    }
+
+    const stationId = new mongoose.Types.ObjectId(station);
+    const startNode = Number(start);
+
+    if(!Number.isInteger(startNode))
+    {
+      return res.status(400).json({
+        success: false,
+        message:"Start node must be integer"
+      });
+    }
+    const startingNode = await Node.findOne({
+      station: stationId,
+      nodeID: startNode
+    });
+
+    if(!startingNode)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Starting node not found in the selected station"
+      });
+    }
+
+    const pois = await POI.find({
+      station: stationId,
+      type: type
+    });
+
+    if(!pois.length)
+    {
+      return res.status(400).json({
+        success: false,
+        message: `No POI is found with type '${type}'.`
+      });
+    }
+
+    const edges = await Edge.find({
+      station: stationId
+    });
+
+    if(!edges.length)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "No edge is found for the selected station"
+      });
+    }
+
+    const graph = buildGraph(edges);
+
+    const nearbyPOIs = [];
+    for (const poi of pois) {
+
+      const result = dijkstra(
+        graph,
+        startNode,
+        poi.nodeID
+      );
+      if(result.distance === null) 
+      {
+        continue;
+      }
+      nearbyPOIs.push({
+        name: poi.name,
+        type: poi.type,
+        nodeId: poi.nodeID,
+        location: poi.location,
+        distance: result.distance,
+        path: result.path
+      });
+    }
+    if(!nearbyPOIs.length) 
+    {
+      return res.status(404).json({
+        success: false,
+        message: "No reachable POIs found."
+      });
+    }
+    nearbyPOIs.sort(
+      (firstPOI, secondPOI) =>firstPOI.distance - secondPOI.distance
+    );
+    const allRouteNodeIds = [
+      ...new Set(
+        nearbyPOIs.flatMap((poi) => poi.path)
+      )
+    ];
+    const routeNodes = await Node.find({
+      station: stationId,
+      nodeID: { $in: allRouteNodeIds }
+    });
+    const nodeMap = {};
+
+    routeNodes.forEach((node) => {
+      nodeMap[node.nodeID] = node.name;
+    });
+
+    nearbyPOIs.forEach((poi) => {
+      poi.path = poi.path.map(
+        (nodeId) =>
+          nodeMap[nodeId] || `Node ${nodeId}`
+      );
+    });
+    return res.status(200).json({
+      success: true,
+      message: "Nearby POIs found successfully.",
+      data: {
+        count: nearbyPOIs.length,
+        pois: nearbyPOIs
+      }
+    });
+}
+catch(error){
+  console.error(error);
+  return res.status(500).json({
+      success: false,
+      message: "Internal Server Error."
+    });
+  }
+};
