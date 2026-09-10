@@ -419,3 +419,131 @@ catch(error){
     });
   }
 };
+
+exports.getRouteToPOI = async(req,res) =>{
+  try{
+    const {station, start, poiID} = req.query;
+    if(!station || !start || !poiID)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Station, start and poiID field are required"
+      });
+    }
+
+    if(!mongoose.Types.ObjectId.isValid(station)|| 
+      !mongoose.Types.ObjectId.isValid(poiID))
+    {
+        return res.status(400).json({
+          success: false,
+          message: "Station or poiID is invalid"
+        });
+    }
+
+    const stationID = new mongoose.Types.ObjectId(station);
+    const startNode = Number(start);
+
+    if(!Number.isInteger(startNode))
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Start node must be valid Integer"
+      });
+    }
+
+    const startingNode = await Node.findOne({
+      station:stationID,
+      nodeID: startNode
+    });
+
+    if(!startingNode)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "Start node not found in the selected station"
+      });
+    }
+
+    const poi = await POI.findOne({
+      _id: poiID,
+      station: stationID
+    });
+
+    if(!poi)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "POI not found in the selected station"
+      });
+    }
+
+    const edges = await Edge.find({
+      station: stationID
+    });
+
+    if(!edges.length)
+    {
+      return res.status(400).json({
+        success: false,
+        message: "No edge found for the selected station"
+      });
+    }
+
+    const graph = buildGraph(edges);
+
+    const result = dijkstra(
+      graph,
+      startNode,
+      poi.nodeID
+    );
+
+    if(result.distance === null || result.path.length === 0) 
+    {
+      return res.status(404).json({
+        success: false,
+        message: "No route exists to the selected POI."
+      });
+    }
+
+    const routeNodes = await Node.find({
+      station: stationID,
+      nodeID: { $in: result.path }
+    });
+
+    const nodeMap = {};
+
+    routeNodes.forEach((node) => {
+      nodeMap[node.nodeID] = node.name;
+    });
+
+    const readablePath = result.path.map(
+      (nodeId) =>
+        nodeMap[nodeId] || `Node ${nodeId}`
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Route to POI found successfully.",
+      data: {
+        poi: {
+          id: poi._id,
+          name: poi.name,
+          type: poi.type,
+          nodeID: poi.nodeID,
+          location: poi.location
+        },
+        distance: result.distance,
+        path: readablePath
+      }
+    });
+    
+  }
+  catch(error)
+  {
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error."
+    });
+
+  }
+};
